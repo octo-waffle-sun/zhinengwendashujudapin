@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>智能问答 · 数据大屏</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: #e7e9ee;
+      background: radial-gradient(1200px 800px at 10% 10%, #1b2130 0%, #0f1420 60%, #0a0f19 100%) fixed;
+      background-color: #0a0f19;
+      overflow: hidden;
+    }
+    .dashboard {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      height: 100vh;
+      width: 100vw;
+      padding: 16px 18px 18px 18px;
+      gap: 14px;
+    }
+
+    /* 顶部标题区 */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+    }
+    .title {
+      display: flex; align-items: baseline; gap: 10px;
+    }
+    .title h1 { font-size: 22px; font-weight: 600; letter-spacing: 0.5px; }
+    .title span { font-size: 12px; color: #9aa4b2; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .badge {
+      padding: 6px 10px; border-radius: 999px; font-size: 12px; color: #c8e1ff;
+      background: linear-gradient(135deg, rgba(46,158,255,0.25), rgba(88,70,255,0.15));
+      border: 1px solid rgba(88,70,255,0.35);
+    }
+
+    /* KPI区 */
+    .kpi-row {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    }
+    .kpi-card {
+      padding: 14px 16px; border-radius: 16px; position: relative; overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+      min-height: 86px;
+    }
+    .kpi-name { font-size: 12px; color: #9aa4b2; }
+    .kpi-value { font-size: 26px; font-weight: 700; margin-top: 8px; }
+    .kpi-extra { font-size: 12px; color: #7ac7a6; margin-top: 6px; }
+    .kpi-trend-up { color: #6ee7b7; }
+    .kpi-trend-down { color: #fca5a5; }
+
+    /* 主图表网格 */
+    .grid {
+      display: grid; gap: 14px;
+      grid-template-columns: 1.2fr 1.6fr 1fr;
+      grid-template-rows: 0.9fr 1.1fr;
+      height: calc(100% - 0px);
+    }
+    .card {
+      border-radius: 16px; position: relative; overflow: hidden; min-height: 240px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+      display: flex; flex-direction: column;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; border-bottom: 1px dashed rgba(255,255,255,0.08);
+    }
+    .card-title { font-size: 14px; color: #dfe6f1; letter-spacing: 0.3px; }
+    .wc-active {
+      display: none; align-items: center; gap: 8px; padding: 4px 10px;
+      border-radius: 999px; font-size: 12px; color: #0b1220;
+      background: linear-gradient(135deg, #51b1ff, #6b62ff);
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+    .wc-active-dot { width: 6px; height: 6px; border-radius: 50%; background: #0b1220; opacity: 0.6; }
+    .tabs { display: inline-flex; background: rgba(255,255,255,0.06); border-radius: 10px; padding: 2px; gap: 2px; }
+    .tab-btn {
+      cursor: pointer; border: none; color: #b9c2d0; background: transparent; padding: 6px 10px; border-radius: 8px; font-size: 12px;
+    }
+    .tab-btn.active { color: #0b1220; background: linear-gradient(135deg, #51b1ff, #6b62ff); font-weight: 600; }
+    .card-body { flex: 1; }
+    .word-cloud .card-body { position: relative; }
+
+    /* 区块布局占位 */
+    .word-cloud { grid-column: 1 / 2; grid-row: 1 / 2; }
+    .trend { grid-column: 2 / 3; grid-row: 1 / 2; }
+    .mode-pie { grid-column: 3 / 4; grid-row: 1 / 2; }
+    .heatmap { grid-column: 1 / 3; grid-row: 2 / 3; }
+    .top-topics { grid-column: 3 / 4; grid-row: 2 / 3; }
+
+    .chart { width: 100%; height: 100%; }
+
+    /* 响应式 */
+    @media (max-width: 1200px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .grid { grid-template-columns: 1fr; grid-template-rows: repeat(5, minmax(240px, 1fr)); overflow: auto; }
+      .word-cloud, .trend, .mode-pie, .heatmap, .top-topics { grid-column: auto; grid-row: auto; }
+      body { overflow: auto; }
+    }
+
+    /* 词云就地下钻区块 */
+    .wc-drilldown { display: none; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
+    .wc-drill-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 10px; border-bottom: 1px dashed rgba(255,255,255,0.08);
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    }
+    .wc-title { font-size: 14px; color: #e7e9ee; }
+    .wc-sub { font-size: 12px; color: #9aa4b2; }
+    .wc-back { appearance: none; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: #cdd6e3; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+     .wc-actions { display: inline-flex; gap: 8px; align-items: center; }
+     .wc-filter-btn { appearance: none; border: 1px solid rgba(81,177,255,0.35); color: #c8e1ff; background: rgba(81,177,255,0.08); padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+     .wc-filter-btn.active {
+       color: #0b1220;
+       background: linear-gradient(135deg, #51b1ff, #6b62ff);
+       border-color: rgba(255,255,255,0.35);
+       font-weight: 600;
+     }
+    .wc-list { height: calc(100% - 52px); overflow: auto; padding: 4px 8px 10px 8px; }
+    .q-item { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 10px; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+    .q-title { font-size: 13px; color: #dfe6f1; line-height: 1.5; }
+     .q-meta { font-size: 12px; color: #9aa4b2; }
+     .q-badge { font-size: 12px; color: #0b1220; background: linear-gradient(135deg, #51b1ff, #6b62ff); padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); }
+     .q-badge.success { background: linear-gradient(135deg, #34d399, #10b981); color: #072214; }
+     .q-badge.warn { background: linear-gradient(135deg, #f59e0b, #ef4444); color: #180a00; }
+     .q-right { display: inline-flex; gap: 8px; align-items: center; }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="header">
+      <div class="title">
+        <h1>智能问答 · 数据大屏</h1>
+        <span id="updateTime">更新中...</span>
+      </div>
+      <div class="header-right">
+        <span class="badge">ECharts</span>
+        <span class="badge">词云</span>
+        <span class="badge">趋势/热力/占比</span>
+      </div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-name">累计问答</div>
+        <div class="kpi-value" id="kpi-total-qa">—</div>
+        <div class="kpi-extra"><span class="kpi-trend-up" id="kpi-total-qa-trend">—</span> 较上期</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">今日新建对话</div>
+        <div class="kpi-value" id="kpi-new-conv">—</div>
+        <div class="kpi-extra"><span class="kpi-trend-up" id="kpi-new-conv-trend">—</span> 较上期</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">今日问答次数</div>
+        <div class="kpi-value" id="kpi-today-qa">—</div>
+        <div class="kpi-extra"><span class="kpi-trend-up" id="kpi-today-qa-trend">—</span> 较上期</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-name">知识库命中率</div>
+        <div class="kpi-value" id="kpi-kb-hit">—</div>
+        <div class="kpi-extra"><span class="kpi-trend-up" id="kpi-kb-hit-trend">—</span> 较上期</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card word-cloud">
+        <div class="card-header">
+          <div class="card-title">问题词云</div>
+          <div id="wc-active" class="wc-active" aria-hidden="true">
+            <span class="wc-active-dot"></span>
+            <span id="wc-active-text">关键词：</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="chart-wordcloud" class="chart"></div>
+          <div id="wc-drill" class="wc-drilldown" aria-hidden="true">
+            <div class="wc-drill-header">
+              <div>
+                <div class="wc-title" id="wc-title">关键词</div>
+                <div class="wc-sub" id="wc-sub">—</div>
+              </div>
+               <div class="wc-actions">
+                 <button id="wc-filter-not" class="wc-filter-btn" aria-pressed="false">仅看未入库</button>
+                 <button id="wc-back" class="wc-back">返回词云</button>
+               </div>
+            </div>
+            <div id="wc-list" class="wc-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card trend">
+        <div class="card-header">
+          <div class="card-title">问答量趋势</div>
+          <div class="tabs" id="granularity-tabs">
+            <button class="tab-btn active" data-gran="day">日</button>
+            <button class="tab-btn" data-gran="week">周</button>
+            <button class="tab-btn" data-gran="month">月</button>
+          </div>
+        </div>
+        <div class="card-body"><div id="chart-trend" class="chart"></div></div>
+      </div>
+
+      <div class="card mode-pie">
+        <div class="card-header">
+          <div class="card-title">功能占比</div>
+        </div>
+        <div class="card-body"><div id="chart-mode" class="chart"></div></div>
+      </div>
+
+      <div class="card heatmap">
+        <div class="card-header">
+          <div class="card-title">活跃时段热力图（小时 × 星期）</div>
+        </div>
+        <div class="card-body"><div id="chart-heatmap" class="chart"></div></div>
+      </div>
+
+      <div class="card top-topics">
+        <div class="card-header">
+          <div class="card-title">高频主题 Top10</div>
+        </div>
+        <div class="card-body"><div id="chart-topics" class="chart"></div></div>
+      </div>
+    </div>
+  </div>
+
+  
+
+  <!-- ECharts 与词云插件（本地文件）-->
+  <script src="echarts.min.js"></script>
+  <script src="echarts-wordcloud.min.js"></script>
+  <script>
+    (function() {
+      const $ = (sel) => document.querySelector(sel);
+      const now = new Date();
+      $('#updateTime').textContent = `上次更新：${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+      // —— Mock 数据生成 ——
+      function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+      function genDaySeries(days = 30) {
+        const data = []; const labels = [];
+        const ref = new Date();
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date(ref); d.setDate(ref.getDate() - i);
+          labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+          data.push(randomInt(40, 210));
+        }
+        return { labels, data };
+      }
+      function genWeekSeries(weeks = 12) {
+        const data = []; const labels = [];
+        for (let i = weeks - 1; i >= 0; i--) {
+          labels.push(`第${52 - i}周`);
+          data.push(randomInt(300, 1200));
+        }
+        return { labels, data };
+      }
+      function genMonthSeries(months = 12) {
+        const data = []; const labels = [];
+        const names = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+        const m = new Date().getMonth();
+        for (let i = months - 1; i >= 0; i--) {
+          const idx = (m - i + 12) % 12;
+          labels.push(names[idx]);
+          data.push(randomInt(1200, 5200));
+        }
+        return { labels, data };
+      }
+      // 词云词频
+      const words = ['接口文档','价格','项目管理','工期','算量','概算','清单','投标','城市','规范','标准','清晰度','权限','登录','报错','优化','对接','预算','材价','人工','模型','图纸','对比','导出','上传','定位','流程','审批','合同','变更','签证','节点','通知','消息','统计','安全','备份','恢复','模板','搜索','知识库','关联','标签'];
+      const wordCloudData = words.map(w => ({ name: w, value: randomInt(20, 300) }));
+
+      // 时段热力
+      const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+      const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+      const heat = [];
+      for (let i = 0; i < days.length; i++) {
+        for (let j = 0; j < hours.length; j++) {
+          // 模拟：工作日白天更活跃
+          const base = (i <= 4 && j >= 9 && j <= 18) ? 80 : 25;
+          heat.push([j, i, Math.max(0, Math.round(base + (Math.random() - 0.5) * base))]);
+        }
+      }
+
+      // 模式占比
+      const modeData = [
+        { name: '深度思考', value: randomInt(18, 36) },
+        { name: '文件问答', value: randomInt(12, 28) },
+        { name: '联网搜索', value: randomInt(15, 30) },
+        { name: '普通对话', value: randomInt(30, 55) }
+      ];
+
+      // Top 主题
+      const topicNames = ['造价规范','合同管理','工程量清单','材料价格','投标策略','进度计划','签证变更','结算审核','安全文明','质量验收'];
+      const topicValues = topicNames.map(() => randomInt(40, 220));
+
+      // KPI（示例）
+      const totalQA = topicValues.reduce((a,b) => a + b, 0) + genDaySeries(7).data.reduce((a,b)=>a+b,0);
+      $('#kpi-total-qa').textContent = totalQA.toLocaleString();
+      $('#kpi-total-qa-trend').textContent = '+12.4%';
+      // 今日新建对话（Mock）
+      $('#kpi-new-conv').textContent = randomInt(30, 160);
+      $('#kpi-new-conv-trend').textContent = '+6.2%';
+      // 今日问答次数（来自日维度序列）
+      const todayQA = genDaySeries(1).data[0];
+      $('#kpi-today-qa').textContent = todayQA.toLocaleString();
+      $('#kpi-today-qa-trend').textContent = '+3.5%';
+      // 知识库命中率（Mock）
+      $('#kpi-kb-hit').textContent = `${randomInt(68, 93)}%`;
+      $('#kpi-kb-hit-trend').textContent = '+1.1%';
+
+      // —— 图表初始化 ——
+      const ec = window.echarts;
+      const wordcloud = ec.init(document.getElementById('chart-wordcloud'));
+      const trend = ec.init(document.getElementById('chart-trend'));
+      const mode = ec.init(document.getElementById('chart-mode'));
+      const heatmap = ec.init(document.getElementById('chart-heatmap'));
+      const topics = ec.init(document.getElementById('chart-topics'));
+
+      // 词云
+      wordcloud.setOption({
+        tooltip: { show: true },
+        series: [{
+          type: 'wordCloud',
+          gridSize: 8,
+          sizeRange: [12, 52],
+          rotationRange: [-45, 0, 45],
+          shape: 'circle',
+          textStyle: {
+            color: function() {
+              const colors = ['#57b1ff', '#6b62ff', '#34d399', '#f59e0b', '#ef4444', '#22d3ee'];
+              return colors[Math.floor(Math.random() * colors.length)];
+            },
+          },
+          emphasis: { textStyle: { shadowBlur: 10, shadowColor: '#000' } },
+          data: wordCloudData,
+        }]
+      });
+
+      // 趋势折柱
+      let granularity = 'day';
+      function trendDataByGran(g) {
+        if (g === 'day') return genDaySeries(30);
+        if (g === 'week') return genWeekSeries(12);
+        return genMonthSeries(12);
+      }
+      function renderTrend(g) {
+        const { labels, data } = trendDataByGran(g);
+        trend.setOption({
+          grid: { left: 40, right: 20, top: 30, bottom: 28 },
+          tooltip: { trigger: 'axis' },
+          xAxis: { type: 'category', data: labels, axisLine: { lineStyle: { color: '#6b7280' }}, axisLabel: { color: '#9aa4b2' } },
+          yAxis: { type: 'value', axisLine: { lineStyle: { color: '#6b7280' }}, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' }}, axisLabel: { color: '#9aa4b2' } },
+          series: [
+            { type: 'bar', data, barWidth: '55%', itemStyle: { color: new ec.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#51b1ff'},{offset:1,color:'#6b62ff'}]) } },
+            { type: 'line', data, symbol: 'circle', symbolSize: 6, smooth: true, lineStyle: { color: '#34d399', width: 2 }, itemStyle: { color: '#34d399' }, yAxisIndex: 0, areaStyle: { color: 'rgba(52,211,153,0.08)' } }
+          ]
+        });
+      }
+      renderTrend(granularity);
+
+      // 占比
+      mode.setOption({
+        tooltip: { trigger: 'item' },
+        legend: { top: 12, textStyle: { color: '#9aa4b2' } },
+        series: [{
+          type: 'pie', radius: ['45%', '70%'], center: ['50%', '55%'],
+          label: { color: '#cdd6e3' },
+          data: modeData.sort((a,b)=>b.value-a.value),
+          itemStyle: { borderWidth: 2, borderColor: 'rgba(10,15,25,0.8)' }
+        }]
+      });
+
+      // 热力图
+      heatmap.setOption({
+        tooltip: { position: 'top' },
+        grid: { left: 60, right: 20, top: 30, bottom: 30 },
+        xAxis: { type: 'category', data: hours, splitArea: { show: true }, axisLabel: { color: '#9aa4b2' } },
+        yAxis: { type: 'category', data: days, splitArea: { show: true }, axisLabel: { color: '#9aa4b2' } },
+        visualMap: {
+          min: 0, max: 160,
+          calculable: true,
+          orient: 'horizontal', left: 'center', bottom: 4,
+          inRange: { color: ['#0ea5e9', '#6366f1', '#22c55e'] },
+          textStyle: { color: '#cdd6e3' }
+        },
+        series: [{
+          name: '活跃度', type: 'heatmap', data: heat,
+          label: { show: false },
+          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' } }
+        }]
+      });
+
+      // Top 主题
+      topics.setOption({
+        grid: { left: 70, right: 18, top: 24, bottom: 20 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'value', axisLabel: { color: '#9aa4b2' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+        yAxis: { type: 'category', data: topicNames, axisLabel: { color: '#cdd6e3' } },
+        series: [{
+          type: 'bar', data: topicValues,
+          itemStyle: { color: new ec.graphic.LinearGradient(1,0,0,0,[{offset:0,color:'#6b62ff'},{offset:1,color:'#51b1ff'}]) },
+          barWidth: 14,
+        }]
+      });
+
+      // 下钻：生成关键词问题列表
+      function generateQuestionsForKeyword(keyword, count = 30) {
+        const templates = [
+          `如何快速解决${keyword}相关问题？`,
+          `${keyword}的最佳实践有哪些？`,
+          `${keyword}常见错误及排查步骤？`,
+          `${keyword}与业务流程如何对接？`,
+          `有没有${keyword}的标准范例或模板？`,
+          `${keyword}在本系统的配置路径？`,
+          `为什么会出现${keyword}异常？`,
+          `如何提升${keyword}的效率与准确率？`,
+          `${keyword}和权限/角色有关吗？如何设置？`,
+          `${keyword}结果如何导出或复用？`
+        ];
+        const items = [];
+        for (let i = 0; i < count; i++) {
+          const title = templates[i % templates.length];
+          const hot = Math.floor(200 - i * (150 / count) + Math.random() * 20);
+          const dt = new Date(Date.now() - i * 3600 * 1000 * 6);
+          const ingested = Math.random() < 0.7; // 约70%已入库
+          items.push({
+            title,
+            hot: Math.max(1, hot),
+            time: `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`,
+            ingested
+          });
+        }
+        items.sort((a,b) => b.hot - a.hot);
+        return items;
+      }
+
+      // 词云就地下钻
+      let currentWcList = [];
+      let showOnlyNotIngested = false;
+
+      function renderWcList() {
+        const listEl = document.getElementById('wc-list');
+        const list = showOnlyNotIngested ? currentWcList.filter(x => !x.ingested) : currentWcList;
+        listEl.innerHTML = list.map((it, idx) => (
+          `<div class="q-item">
+            <div>
+              <div class="q-title">${idx+1}. ${it.title}</div>
+              <div class="q-meta">更新时间：${it.time}</div>
+            </div>
+            <div class="q-right">
+              <div class="q-badge">热度 ${it.hot}</div>
+              <div class="q-badge ${it.ingested ? 'success' : 'warn'}">${it.ingested ? '已入库' : '未入库'}</div>
+            </div>
+          </div>`
+        )).join('');
+      }
+
+      function openWcDrill(keyword, total = null) {
+        const wc = document.getElementById('wc-drill');
+        const cloud = document.getElementById('chart-wordcloud');
+        const active = document.getElementById('wc-active');
+        const activeText = document.getElementById('wc-active-text');
+        const title = document.getElementById('wc-title');
+        const sub = document.getElementById('wc-sub');
+        title.textContent = `“${keyword}” 相关问题`;
+        sub.textContent = total != null ? `词频：${total} · 排序：热度` : `排序：热度`;
+        currentWcList = generateQuestionsForKeyword(keyword, 40);
+        renderWcList();
+        cloud.style.visibility = 'hidden';
+        wc.style.display = 'block';
+        wc.setAttribute('aria-hidden', 'false');
+        if (active && activeText) {
+          activeText.textContent = `关键词：${keyword}`;
+          active.style.display = 'inline-flex';
+          active.setAttribute('aria-hidden', 'false');
+        }
+      }
+
+      function closeWcDrill() {
+        const wc = document.getElementById('wc-drill');
+        const cloud = document.getElementById('chart-wordcloud');
+        const active = document.getElementById('wc-active');
+        wc.style.display = 'none';
+        wc.setAttribute('aria-hidden', 'true');
+        cloud.style.visibility = 'visible';
+        if (active) {
+          active.style.display = 'none';
+          active.setAttribute('aria-hidden', 'true');
+        }
+        // 重置筛选
+        showOnlyNotIngested = false;
+        const filterBtn = document.getElementById('wc-filter-not');
+        if (filterBtn) {
+          filterBtn.classList.remove('active');
+          filterBtn.setAttribute('aria-pressed', 'false');
+        }
+      }
+
+      document.getElementById('wc-back').addEventListener('click', closeWcDrill);
+      const filterBtn = document.getElementById('wc-filter-not');
+      if (filterBtn) {
+        filterBtn.addEventListener('click', () => {
+          showOnlyNotIngested = !showOnlyNotIngested;
+          filterBtn.classList.toggle('active', showOnlyNotIngested);
+          filterBtn.setAttribute('aria-pressed', String(showOnlyNotIngested));
+          renderWcList();
+        });
+      }
+
+      wordcloud.on('click', function(params) {
+        const kw = params && params.name ? params.name : '';
+        const total = params && params.value ? params.value : null;
+        if (kw) openWcDrill(kw, total);
+      });
+
+      // 交互：切换粒度
+      const tabs = Array.from(document.querySelectorAll('#granularity-tabs .tab-btn'));
+      tabs.forEach(btn => btn.addEventListener('click', () => {
+        tabs.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        granularity = btn.dataset.gran;
+        renderTrend(granularity);
+      }));
+
+      // Resize 自适应
+      const charts = [wordcloud, trend, mode, heatmap, topics];
+      window.addEventListener('resize', () => charts.forEach(c => c.resize()));
+
+      // 实际接入：将以上 Mock 替换为接口数据，并绑定到 setOption 中即可
+    })();
+  </script>
+</body>
+</html>
+
+
